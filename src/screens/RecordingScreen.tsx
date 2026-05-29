@@ -15,12 +15,14 @@ interface Props {
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
-  const ms = Math.floor((secs % 1) * 100);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+  const cs = Math.floor((secs % 1) * 100); // centiseconds
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
 function defaultTitle(): string {
-  return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return new Date().toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
 }
 
 export function RecordingScreen({ onNavigate, onRecordingSaved }: Props) {
@@ -41,7 +43,7 @@ export function RecordingScreen({ onNavigate, onRecordingSaved }: Props) {
     if (recorder.state !== 'recording') return;
     const marker = recorder.addMarker();
     setMarkFlash(true);
-    setTimeout(() => setMarkFlash(false), 300);
+    setTimeout(() => setMarkFlash(false), 280);
     setActiveSheet(marker);
   }, [recorder]);
 
@@ -74,74 +76,109 @@ export function RecordingScreen({ onNavigate, onRecordingSaved }: Props) {
 
   return (
     <div className="screen rec-screen">
-      <div className="rec-top-bar">
-        <button className="top-btn" onClick={handleCancel}>Cancel</button>
-        {editingTitle ? (
-          <input
-            className="rec-title-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => setEditingTitle(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-            autoFocus
-          />
-        ) : (
-          <button className="rec-title-btn" onClick={() => setEditingTitle(true)}>
-            {title}
-          </button>
-        )}
-        <div style={{ width: 64 }} />
+
+      {/* ── Translucent nav bar ── */}
+      <div className="nav-bar">
+        <button className="nav-btn" onClick={handleCancel}>
+          Cancel
+        </button>
+
+        <div className="nav-title-area">
+          {editingTitle ? (
+            <input
+              className="nav-title-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => setEditingTitle(false)}
+              onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+              autoFocus
+            />
+          ) : (
+            <button
+              className="nav-title"
+              style={{ background: 'none', cursor: 'text' }}
+              onClick={() => setEditingTitle(true)}
+            >
+              {title}
+            </button>
+          )}
+          {/* Recording indicator dot */}
+          {started && recorder.state === 'recording' && (
+            <span style={{ fontSize: 9, color: 'var(--red)', letterSpacing: 1 }}>● REC</span>
+          )}
+          {started && recorder.state === 'paused' && (
+            <span style={{ fontSize: 9, color: 'var(--label3)', letterSpacing: 1 }}>PAUSED</span>
+          )}
+        </div>
+
+        <div style={{ minWidth: 64 }} />
       </div>
 
+      {/* ── Live waveform ── */}
       <div className="rec-waveform-area">
         {started ? (
           <WaveformCanvas mode="recording" liveData={recorder.waveformData} />
         ) : (
           <div className="rec-idle-hint">
             <div className="rec-idle-pulse" />
-            <p>Tap the button below to start recording</p>
+            <p>Tap record to begin</p>
           </div>
         )}
       </div>
 
+      {/* ── Timer ── */}
       <div className="rec-timer">{formatTime(recorder.elapsed)}</div>
 
+      {/* ── Marker count ── */}
       {started && (
         <div className="rec-markers-count">
           {recorder.markers.length > 0 && (
-            <span className="markers-badge">{recorder.markers.length} marker{recorder.markers.length !== 1 ? 's' : ''}</span>
+            <span className="markers-badge">
+              {recorder.markers.length} marker{recorder.markers.length !== 1 ? 's' : ''}
+            </span>
           )}
         </div>
       )}
 
+      {/* ── Controls ── */}
       <div className="rec-controls">
         {!started ? (
-          <button className="rec-main-btn" onClick={handleStart}>
+          /* Idle: single large record button */
+          <button className="rec-start-btn" onClick={handleStart}>
             <div className="rec-dot" />
           </button>
         ) : (
           <>
+            {/* Mark */}
             <button
               className={`mark-btn ${markFlash ? 'flash' : ''}`}
               onClick={handleMark}
               disabled={recorder.state !== 'recording'}
             >
-              <Bookmark size={20} />
+              <Bookmark size={18} />
               <span>Mark</span>
             </button>
 
-            <button className="rec-main-btn" onClick={recorder.state === 'recording' ? recorder.pause : recorder.resume}>
-              {recorder.state === 'recording' ? <Pause size={26} fill="white" /> : <Play size={26} fill="white" />}
+            {/* Pause / Resume */}
+            <button
+              className="rec-main-btn"
+              onClick={recorder.state === 'recording' ? recorder.pause : recorder.resume}
+            >
+              {recorder.state === 'recording'
+                ? <Pause size={26} fill="white" strokeWidth={0} />
+                : <Play size={26} fill="white" strokeWidth={0} style={{ marginLeft: 3 }} />}
             </button>
 
+            {/* Stop */}
             <button className="stop-btn" onClick={handleStop} disabled={saving}>
-              <Square size={20} fill="white" />
-              <span>{saving ? 'Saving…' : 'Stop'}</span>
+              <Square size={18} fill="white" strokeWidth={0} />
+              <span>{saving ? 'Saving' : 'Stop'}</span>
             </button>
           </>
         )}
       </div>
 
+      {/* ── Marker label sheet ── */}
       <MarkerSheet
         marker={activeSheet}
         onSave={recorder.updateMarker}

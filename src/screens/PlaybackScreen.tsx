@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ArrowLeft, Play, Pause, RotateCcw, RotateCw, Trash2, Repeat, Edit3, Check, X } from 'lucide-react';
+import { ChevronLeft, Play, Pause, RotateCcw, RotateCw, Trash2, Repeat, Edit3, Check, X } from 'lucide-react';
 import { usePlayer } from '../hooks/usePlayer';
 import { WaveformCanvas } from '../components/WaveformCanvas';
 import type { Recording, Marker, AppScreen } from '../types';
@@ -13,10 +13,10 @@ interface Props {
 }
 
 function formatTime(t: number): string {
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  const ms = Math.floor((t % 1) * 100);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+  const m  = Math.floor(t / 60);
+  const s  = Math.floor(t % 60);
+  const cs = Math.floor((t % 1) * 100);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
 function formatMarkerTime(t: number): string {
@@ -27,15 +27,15 @@ function formatMarkerTime(t: number): string {
 
 export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }: Props) {
   const player = usePlayer();
-  const [recording, setRecording] = useState<Recording | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [recording, setRecording]       = useState<Recording | null>(null);
+  const [loaded, setLoaded]             = useState(false);
   const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null);
-  const [looping, setLooping] = useState(false);
+  const [looping, setLooping]           = useState(false);
   const [loopMarkerId, setLoopMarkerId] = useState<string | null>(null);
   const [editingMarker, setEditingMarker] = useState<string | null>(null);
-  const [editNote, setEditNote] = useState('');
+  const [editNote, setEditNote]         = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
+  const [titleDraft, setTitleDraft]     = useState('');
   const loopRef = useRef({ active: false, start: 0, end: 0 });
 
   useEffect(() => {
@@ -43,13 +43,12 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
     if (!r) return;
     setRecording(r);
     setTitleDraft(r.title);
-
-    getAudio(recordingId).then((blob) => {
-      if (blob) return player.load(blob);
-    }).then(() => setLoaded(true));
+    getAudio(recordingId)
+      .then((blob) => { if (blob) return player.load(blob); })
+      .then(() => setLoaded(true));
   }, [recordingId]);
 
-  // Track active marker during playback
+  // Track active marker
   useEffect(() => {
     if (!recording) return;
     const sorted = [...recording.markers].sort((a, b) => a.timestamp - b.timestamp);
@@ -62,20 +61,16 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
     if (!looping || !loopMarkerId || !recording) return;
     const marker = recording.markers.find((m) => m.id === loopMarkerId);
     if (!marker) return;
-
-    const start = marker.timestamp;
     const sorted = [...recording.markers].sort((a, b) => a.timestamp - b.timestamp);
     const idx = sorted.findIndex((m) => m.id === loopMarkerId);
     const end = sorted[idx + 1]?.timestamp ?? player.duration;
-    loopRef.current = { active: true, start, end };
+    loopRef.current = { active: true, start: marker.timestamp, end };
   }, [looping, loopMarkerId, recording, player.duration]);
 
   useEffect(() => {
     if (!loopRef.current.active) return;
     const { start, end } = loopRef.current;
-    if (player.currentTime >= end) {
-      player.seek(start);
-    }
+    if (player.currentTime >= end) player.seek(start);
   }, [player.currentTime]);
 
   const jumpToMarker = (marker: Marker) => {
@@ -135,39 +130,54 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
     onNavigate({ name: 'home' });
   }, [recording, onNavigate, onRecordingsChanged]);
 
-  const sortedMarkers = recording ? [...recording.markers].sort((a, b) => a.timestamp - b.timestamp) : [];
+  const sortedMarkers = recording
+    ? [...recording.markers].sort((a, b) => a.timestamp - b.timestamp)
+    : [];
 
   return (
     <div className="screen playback-screen">
-      <div className="pb-top-bar">
-        <button className="top-btn icon-btn" onClick={() => onNavigate({ name: 'home' })}>
-          <ArrowLeft size={20} />
+
+      {/* ── Translucent nav bar ── */}
+      <div className="nav-bar">
+        {/* Back button: chevron + parent title */}
+        <button className="nav-btn" onClick={() => onNavigate({ name: 'home' })}>
+          <ChevronLeft size={20} strokeWidth={2.5} />
+          <span style={{ fontSize: 'var(--type-body)' }}>All Recordings</span>
         </button>
-        <div className="pb-title-area">
+
+        <div className="nav-title-area">
           {editingTitle ? (
-            <div className="pb-title-edit">
+            <div className="nav-title-edit">
               <input
-                className="pb-title-input"
+                className="nav-title-input"
                 value={titleDraft}
                 onChange={(e) => setTitleDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
                 autoFocus
               />
-              <button className="icon-btn-sm" onClick={saveTitle}><Check size={16} /></button>
-              <button className="icon-btn-sm" onClick={() => setEditingTitle(false)}><X size={16} /></button>
+              <button className="icon-btn-sm" onClick={saveTitle}><Check size={15} /></button>
+              <button className="icon-btn-sm" onClick={() => setEditingTitle(false)}><X size={15} /></button>
             </div>
           ) : (
-            <button className="pb-title-btn" onClick={() => setEditingTitle(true)}>
+            <button
+              className="nav-title"
+              style={{ background: 'none', cursor: 'text' }}
+              onClick={() => setEditingTitle(true)}
+            >
               {recording?.title}
             </button>
           )}
-          <span className="pb-duration">{loaded ? formatTime(player.duration) : '—'}</span>
+          {loaded && (
+            <span className="nav-subtitle">{formatTime(player.duration)}</span>
+          )}
         </div>
-        <button className="top-btn icon-btn danger" onClick={handleDelete}>
+
+        <button className="nav-btn danger" style={{ justifyContent: 'flex-end' }} onClick={handleDelete}>
           <Trash2 size={18} />
         </button>
       </div>
 
+      {/* ── Waveform ── */}
       <div className="pb-waveform-area">
         {loaded ? (
           <WaveformCanvas
@@ -183,26 +193,33 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
         )}
       </div>
 
+      {/* ── Large time display ── */}
       <div className="pb-time">{formatTime(player.currentTime)}</div>
 
+      {/* ── Transport controls ── */}
       <div className="pb-transport">
         <button className="transport-btn" onClick={() => player.skipBy(-15)}>
-          <RotateCcw size={22} />
+          <RotateCcw size={24} />
           <span>15</span>
         </button>
+
         <button
           className="pb-play-btn"
           onClick={player.playing ? player.pause : player.play}
           disabled={!loaded}
         >
-          {player.playing ? <Pause size={26} fill="white" /> : <Play size={26} fill="white" />}
+          {player.playing
+            ? <Pause size={26} fill="white" strokeWidth={0} />
+            : <Play  size={26} fill="white" strokeWidth={0} style={{ marginLeft: 3 }} />}
         </button>
+
         <button className="transport-btn" onClick={() => player.skipBy(15)}>
-          <RotateCw size={22} />
+          <RotateCw size={24} />
           <span>15</span>
         </button>
       </div>
 
+      {/* ── Markers list ── */}
       {sortedMarkers.length > 0 && (
         <div className="pb-markers-section">
           <div className="pb-markers-header">
@@ -211,8 +228,8 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
           </div>
           <div className="pb-markers-list">
             {sortedMarkers.map((marker) => {
-              const isActive = activeMarkerId === marker.id;
-              const isLooping = looping && loopMarkerId === marker.id;
+              const isActive   = activeMarkerId === marker.id;
+              const isLooping  = looping && loopMarkerId === marker.id;
               return (
                 <div
                   key={marker.id}
@@ -240,14 +257,16 @@ export function PlaybackScreen({ recordingId, onNavigate, onRecordingsChanged }:
                         </button>
                       </div>
                     ) : (
-                      <span className="pb-marker-note">{marker.note || <em>No label</em>}</span>
+                      <span className="pb-marker-note">
+                        {marker.note || <em>No label</em>}
+                      </span>
                     )}
                   </div>
                   <div className="pb-marker-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                       className={`icon-btn-sm ${isLooping ? 'looping' : ''}`}
                       onClick={() => toggleLoop(marker.id)}
-                      title="Loop this section"
+                      title="Loop section"
                     >
                       <Repeat size={14} />
                     </button>

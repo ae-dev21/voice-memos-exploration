@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mic, Search, ChevronRight, Clock, Tag } from 'lucide-react';
+import { Mic, Search, ChevronRight, Clock, Bookmark } from 'lucide-react';
 import type { Recording, AppScreen } from '../types';
 import { getAll, remove } from '../store/recordings';
 import { deleteAudio } from '../store/db';
@@ -12,14 +12,17 @@ interface Props {
 function formatDuration(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    return `${h}:${String(m % 60).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`;
 }
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
   const now = new Date();
-  const diffMs = now.getTime() - ts;
-  const diffDays = Math.floor(diffMs / 86400000);
+  const diffDays = Math.floor((now.getTime() - ts) / 86400000);
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'long' });
@@ -32,7 +35,6 @@ export function HomeScreen({ onNavigate, refreshKey }: Props) {
   const [swipedId, setSwipedId] = useState<string | null>(null);
 
   const load = useCallback(() => setRecordings(getAll()), []);
-
   useEffect(() => { load(); }, [load, refreshKey]);
 
   const filtered = query.trim()
@@ -58,44 +60,65 @@ export function HomeScreen({ onNavigate, refreshKey }: Props) {
 
   return (
     <div className="screen home-screen">
-      <div className="home-header">
-        <h1 className="home-title">Voice Memos</h1>
+
+      {/* ── Translucent nav bar ── */}
+      <div className="nav-bar">
+        <div style={{ minWidth: 44 }} />
+        <div className="nav-title-area">
+          {/* Title only shown when searching / collapsed */}
+          {query && <span className="nav-title">Voice Memos</span>}
+        </div>
+        <div style={{ minWidth: 44 }} />
       </div>
 
-      <div className="search-bar">
-        <Search size={16} color="rgba(255,255,255,0.4)" />
-        <input
-          className="search-input"
-          placeholder="Search recordings or labels…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {query && (
-          <button className="search-clear" onClick={() => setQuery('')}>×</button>
-        )}
+      {/* ── Large Title ── */}
+      {!query && (
+        <div className="home-large-title-area">
+          <h1 className="home-large-title">Voice Memos</h1>
+        </div>
+      )}
+
+      {/* ── Search bar (iOS style) ── */}
+      <div className="search-wrap">
+        <div className="search-bar">
+          <Search size={17} color="currentColor" style={{ color: 'var(--label3)' }} />
+          <input
+            className="search-input"
+            placeholder="Search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button className="search-clear" onClick={() => setQuery('')}>×</button>
+          )}
+        </div>
       </div>
 
+      {/* ── Tag filter chips ── */}
       {allTags.length > 0 && !query && (
         <div className="tag-chips">
           {allTags.map((tag) => (
             <button key={tag} className="tag-chip" onClick={() => setQuery(tag)}>
-              <Tag size={11} />
               {tag}
             </button>
           ))}
         </div>
       )}
 
+      {/* ── Recordings list ── */}
       <div className="recordings-list">
         {filtered.length === 0 && (
           <div className="empty-state">
             <div className="empty-icon">
-              <Mic size={36} color="rgba(255,255,255,0.2)" />
+              <Mic size={32} color="var(--label3)" />
             </div>
-            <p className="empty-title">{query ? 'No results' : 'No recordings yet'}</p>
-            <p className="empty-sub">{query ? 'Try a different search term' : 'Tap the button below to start recording'}</p>
+            <p className="empty-title">{query ? 'No Results' : 'No Recordings Yet'}</p>
+            <p className="empty-sub">
+              {query ? 'Try a different search term.' : 'Tap the button below to start your first recording.'}
+            </p>
           </div>
         )}
+
         {filtered.map((r) => (
           <div
             key={r.id}
@@ -112,8 +135,8 @@ export function HomeScreen({ onNavigate, refreshKey }: Props) {
                   </span>
                   {r.markers.length > 0 && (
                     <span className="card-markers">
-                      <Tag size={11} />
-                      {r.markers.length} marker{r.markers.length !== 1 ? 's' : ''}
+                      <Bookmark size={10} />
+                      {r.markers.length}
                     </span>
                   )}
                 </div>
@@ -125,7 +148,7 @@ export function HomeScreen({ onNavigate, refreshKey }: Props) {
                   </div>
                 )}
               </div>
-              <ChevronRight size={16} color="rgba(255,255,255,0.25)" />
+              <ChevronRight size={16} className="card-chevron" />
             </div>
             <button
               className="card-delete"
@@ -137,6 +160,7 @@ export function HomeScreen({ onNavigate, refreshKey }: Props) {
         ))}
       </div>
 
+      {/* ── Record FAB ── */}
       <div className="home-fab-area">
         <button className="record-fab" onClick={() => onNavigate({ name: 'recording' })}>
           <Mic size={28} />
